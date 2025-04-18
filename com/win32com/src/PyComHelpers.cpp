@@ -96,37 +96,71 @@ PYCOM_EXPORT BOOL PyObject_AsCurrency(PyObject *ob, CURRENCY *pcy)
 
 PYCOM_EXPORT PyObject *PyObject_FromDecimal(DECIMAL &dec)
 {
-    static char *hex_str_conv = "%lx%016llx";
-    static char *scaleb = "scaleb";
-    static char *multiply = "__mul__";
-    if (Decimal_class == NULL) {
-        Decimal_class = get_Decimal_class();
-        if (Decimal_class == NULL)
-            return FALSE;
-    }
-
-    // can be optimized by limit checking first to avoid string conversion
-    PyObject *pLongObj = NULL;
-    char buffer[32];
-    sprintf(buffer, hex_str_conv, dec.Hi32, dec.Lo64);
-    pLongObj = PyLong_FromString(buffer, NULL, 16);
-
-    TmpPyObject decimal_result = PyObject_CallFunction(Decimal_class, "O", pLongObj);
-    Py_XDECREF(pLongObj);
-
-    if (decimal_result == NULL) {
+    // init Decimal_class
+    if (!Decimal_class && !(Decimal_class = get_Decimal_class())) {
         return NULL;
     }
 
+    // assemble 128‑bit integer: (Hi32 << 64) + Lo64
+    PyObject *hi = PyLong_FromUnsignedLong(dec.Hi32);
+    if (!hi) {
+        return NULL;
+    }
+
+    PyObject *sh = PyLong_FromLong(64);
+    if (!sh) {
+        Py_DECREF(hi);
+        return NULL;
+    }
+
+    PyObject *hi_shift = PyNumber_Lshift(hi, sh);
+    Py_DECREF(hi);
+    Py_DECREF(sh);
+    if (!hi_shift) {
+        return NULL;
+    }
+
+    PyObject *lo = PyLong_FromUnsignedLongLong(dec.Lo64);
+    if (!lo) {
+        Py_DECREF(hi_shift);
+        return NULL;
+    }
+
+    PyObject *big = PyNumber_Add(hi_shift, lo);
+    Py_DECREF(hi_shift);
+    Py_DECREF(lo);
+    if (!big) {
+        return NULL;
+    }
+
+    // call Decimal(big)
+    PyObject *res = PyObject_CallFunctionObjArgs(Decimal_class, big, NULL);
+    Py_DECREF(big);
+    if (!res) {
+        return NULL;
+    }
+
+    // apply scale
     if (dec.scale > 0) {
-        decimal_result = PyObject_CallMethod(decimal_result, scaleb, "l", -dec.scale);
+        PyObject *tmp = PyObject_CallMethod(res, "scaleb", "l", -dec.scale);
+        Py_DECREF(res);
+        if (!tmp) {
+            return NULL;
+        }
+        res = tmp;
     }
 
+    // apply sign
     if (dec.sign > 0) {
-        decimal_result = PyObject_CallMethod(decimal_result, multiply, "l", -1);
+        PyObject *tmp = PyObject_CallMethod(res, "__mul__", "l", -1);
+        Py_DECREF(res);
+        if (!tmp) {
+            return NULL;
+        }
+        res = tmp;
     }
 
-    return decimal_result;
+    return res;
 }
 
 PYCOM_EXPORT BOOL PyObject_AsDecimal(PyObject *ob, DECIMAL *pdec)
