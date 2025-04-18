@@ -118,11 +118,11 @@ PYCOM_EXPORT PyObject *PyObject_FromDecimal(DECIMAL &dec)
         return NULL;
     }
     
-    if dec.scale > 0 {
+    if (dec.scale > 0) {
         decimal_result = PyObject_CallMethod(decimal_result, scaleb, "l", -dec.scale);
     }
 
-    if dec.sign > 0 {
+    if (dec.sign > 0) {
         decimal_result = PyObject_CallMethod(decimal_result, multiply, "l", -1);
     }
 
