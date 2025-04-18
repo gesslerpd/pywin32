@@ -145,8 +145,8 @@ PYCOM_EXPORT BOOL PyObject_AsDecimal(PyObject *ob, DECIMAL *pdec)
         return FALSE;
     }
 
-    // get (sign, digits, exponent) tuple
-    TmpPyObject tup = PyObject_CallMethod(ob, "as_tuple", NULL);
+    // get (sign, digits, exponent)
+    PyObject *tup = PyObject_CallMethod(ob, "as_tuple", NULL);
     if (!tup) return FALSE;
     if (!PyTuple_Check(tup) || PyTuple_Size(tup) != 3) {
         Py_DECREF(tup);
@@ -159,36 +159,33 @@ PYCOM_EXPORT BOOL PyObject_AsDecimal(PyObject *ob, DECIMAL *pdec)
     long exp  = PyLong_AsLong(PyTuple_GET_ITEM(tup, 2));
     if (PyErr_Occurred()) { Py_DECREF(tup); return FALSE; }
 
-    // compute scale = -exp if negative, else 0
     unsigned char scale = (exp < 0) ? (unsigned char)(-exp) : 0;
 
-    // obtain integer mantissa: if scale>0, call scaleb(scale), else use original
-    PyObject *val = (scale > 0)
-        ? PyObject_CallMethod(ob, "scaleb", "l", scale)
-        : ob;
-    if (!val) { Py_DECREF(tup); return FALSE; }
-    if (scale == 0) Py_INCREF(val);
+    PyObject *val;
+    if (scale > 0) {
+        val = PyObject_CallMethod(ob, "scaleb", "l", scale);
+        if (!val) { Py_DECREF(tup); return FALSE; }
+    }
+    else {
+        val = ob; Py_INCREF(val);
+    }
 
     TmpPyObject mant = PyNumber_Long(val);
     Py_DECREF(val);
     if (!mant) { Py_DECREF(tup); return FALSE; }
 
-    // split 96‑bit mantissa into Lo64 and Hi32
     unsigned long long lo64 = PyLong_AsUnsignedLongLong(mant);
     if (PyErr_Occurred()) { Py_DECREF(tup); return FALSE; }
 
     TmpPyObject shamt = PyLong_FromLong(64);
     TmpPyObject high = PyNumber_Rshift(mant, shamt);
-    Py_DECREF(shamt);
     if (!high) { Py_DECREF(tup); return FALSE; }
 
     unsigned long hi32 = PyLong_AsUnsignedLong(high);
-    Py_DECREF(high);
     if (PyErr_Occurred()) { Py_DECREF(tup); return FALSE; }
 
     Py_DECREF(tup);
 
-    // assign to DECIMAL
     pdec->wReserved = 0;
     pdec->scale     = scale;
     pdec->sign      = (unsigned char)sign;
