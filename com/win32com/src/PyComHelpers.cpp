@@ -145,31 +145,43 @@ PYCOM_EXPORT BOOL PyObject_AsDecimal(PyObject *ob, DECIMAL *pdec)
         return FALSE;
     }
 
-    // get exponent and sign
+    // get (sign, digits, exponent) tuple
     TmpPyObject tup = PyObject_CallMethod(ob, "as_tuple", NULL);
     if (!tup) return FALSE;
-    PyObject *pyExp  = PyObject_GetAttrString(tup, "exponent");
-    PyObject *pySign = PyObject_GetAttrString(tup, "sign");
-    if (!pyExp || !pySign) { Py_XDECREF(pyExp); Py_XDECREF(pySign); Py_DECREF(tup); return FALSE; }
-    long exp  = PyLong_AsLong(pyExp);  Py_DECREF(pyExp);
-    long sign = PyLong_AsLong(pySign); Py_DECREF(pySign);
+    if (!PyTuple_Check(tup) || PyTuple_Size(tup) != 3) {
+        Py_DECREF(tup);
+        PyErr_SetString(PyExc_TypeError, "Decimal.as_tuple() did not return 3‐tuple");
+        return FALSE;
+    }
+
+    // extract sign and exponent
+    long sign = PyLong_AsLong(PyTuple_GET_ITEM(tup, 0));
+    long exp  = PyLong_AsLong(PyTuple_GET_ITEM(tup, 2));
     if (PyErr_Occurred()) { Py_DECREF(tup); return FALSE; }
 
-    // scale = number of decimal places
+    // compute scale = -exp if negative, else 0
     unsigned char scale = (exp < 0) ? (unsigned char)(-exp) : 0;
 
-    // shift decimal to integer: mantissa = int(ob.scaleb(scale))
-    TmpPyObject shifted = PyObject_CallMethod(ob, "scaleb", "l", scale);
-    if (!shifted) { Py_DECREF(tup); return FALSE; }
-    TmpPyObject mant    = PyNumber_Long(shifted);
-    Py_DECREF(shifted);
+    // obtain integer mantissa: if scale>0, call scaleb(scale), else use original
+    PyObject *val = (scale > 0)
+        ? PyObject_CallMethod(ob, "scaleb", "l", scale)
+        : ob;
+    if (!val) { Py_DECREF(tup); return FALSE; }
+    if (scale == 0) Py_INCREF(val);
+
+    TmpPyObject mant = PyNumber_Long(val);
+    Py_DECREF(val);
     if (!mant) { Py_DECREF(tup); return FALSE; }
 
     // split 96‑bit mantissa into Lo64 and Hi32
     unsigned long long lo64 = PyLong_AsUnsignedLongLong(mant);
     if (PyErr_Occurred()) { Py_DECREF(tup); return FALSE; }
-    TmpPyObject high = PyNumber_Rshift(mant, PyLong_FromLong(64));
+
+    TmpPyObject shamt = PyLong_FromLong(64);
+    TmpPyObject high = PyNumber_Rshift(mant, shamt);
+    Py_DECREF(shamt);
     if (!high) { Py_DECREF(tup); return FALSE; }
+
     unsigned long hi32 = PyLong_AsUnsignedLong(high);
     Py_DECREF(high);
     if (PyErr_Occurred()) { Py_DECREF(tup); return FALSE; }
