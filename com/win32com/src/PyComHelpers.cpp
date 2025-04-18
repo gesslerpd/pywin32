@@ -145,67 +145,35 @@ PYCOM_EXPORT BOOL PyObject_AsDecimal(PyObject *ob, DECIMAL *pdec)
         return FALSE;
     }
 
-    // populate the DECIMAL *pdec structure from the decimal.Decimal *ob
+    // get exponent and sign
     TmpPyObject tup = PyObject_CallMethod(ob, "as_tuple", NULL);
     if (!tup) return FALSE;
-
-    // sign
+    PyObject *pyExp  = PyObject_GetAttrString(tup, "exponent");
     PyObject *pySign = PyObject_GetAttrString(tup, "sign");
-    if (!pySign) { Py_DECREF(tup); return FALSE; }
-    long sign = PyLong_AsLong(pySign);
-    Py_DECREF(pySign);
+    if (!pyExp || !pySign) { Py_XDECREF(pyExp); Py_XDECREF(pySign); Py_DECREF(tup); return FALSE; }
+    long exp  = PyLong_AsLong(pyExp);  Py_DECREF(pyExp);
+    long sign = PyLong_AsLong(pySign); Py_DECREF(pySign);
     if (PyErr_Occurred()) { Py_DECREF(tup); return FALSE; }
 
-    // exponent
-    PyObject *pyExp = PyObject_GetAttrString(tup, "exponent");
-    if (!pyExp) { Py_DECREF(tup); return FALSE; }
-    long exp = PyLong_AsLong(pyExp);
-    Py_DECREF(pyExp);
-    if (PyErr_Occurred()) { Py_DECREF(tup); return FALSE; }
+    // scale = number of decimal places
+    unsigned char scale = (exp < 0) ? (unsigned char)(-exp) : 0;
 
-    // digits tuple
-    PyObject *pyDigits = PyObject_GetAttrString(tup, "digits");
-    if (!pyDigits) { Py_DECREF(tup); return FALSE; }
+    // shift decimal to integer: mantissa = int(ob.scaleb(scale))
+    TmpPyObject shifted = PyObject_CallMethod(ob, "scaleb", "l", scale);
+    if (!shifted) { Py_DECREF(tup); return FALSE; }
+    TmpPyObject mant    = PyNumber_Long(shifted);
+    Py_DECREF(shifted);
+    if (!mant) { Py_DECREF(tup); return FALSE; }
 
-    // build mantissa = int.from_digits(digits)
-    TmpPyObject mant = PyLong_FromLong(0);
-    if (!mant) { Py_DECREF(pyDigits); Py_DECREF(tup); return FALSE; }
-    Py_ssize_t nd = PyTuple_Size(pyDigits);
-    for (Py_ssize_t i = 0; i < nd; ++i) {
-        PyObject *d = PyTuple_GetItem(pyDigits, i);  // borrowed
-        TmpPyObject m10 = PyNumber_Multiply(mant, PyLong_FromLong(10));
-        if (!m10) { Py_DECREF(pyDigits); Py_DECREF(tup); return FALSE; }
-        mant = m10;
-        TmpPyObject m1 = PyNumber_Add(mant, d);
-        if (!m1) { Py_DECREF(pyDigits); Py_DECREF(tup); return FALSE; }
-        mant = m1;
-    }
-
-    // determine scale
-    unsigned char scale = 0;
-    if (exp < 0) {
-        scale = (unsigned char)(-exp);
-    }
-    else if (exp > 0) {
-        // mant *= 10**exp
-        TmpPyObject p10 = PyNumber_Power(PyLong_FromLong(10), PyLong_FromLong(exp), Py_None);
-        if (!p10) { Py_DECREF(pyDigits); Py_DECREF(tup); return FALSE; }
-        TmpPyObject nm = PyNumber_Multiply(mant, p10);
-        if (!nm) { Py_DECREF(pyDigits); Py_DECREF(tup); return FALSE; }
-        mant = nm;
-        scale = 0;
-    }
-
-    // split into Lo64 and Hi32
+    // split 96‑bit mantissa into Lo64 and Hi32
     unsigned long long lo64 = PyLong_AsUnsignedLongLong(mant);
-    if (PyErr_Occurred()) { Py_DECREF(pyDigits); Py_DECREF(tup); return FALSE; }
-    TmpPyObject shiftAmt = PyLong_FromLong(64);
-    TmpPyObject high    = PyNumber_Rshift(mant, shiftAmt);
-    if (!high) { Py_DECREF(pyDigits); Py_DECREF(tup); return FALSE; }
+    if (PyErr_Occurred()) { Py_DECREF(tup); return FALSE; }
+    TmpPyObject high = PyNumber_Rshift(mant, PyLong_FromLong(64));
+    if (!high) { Py_DECREF(tup); return FALSE; }
     unsigned long hi32 = PyLong_AsUnsignedLong(high);
-    if (PyErr_Occurred()) { Py_DECREF(pyDigits); Py_DECREF(tup); return FALSE; }
+    Py_DECREF(high);
+    if (PyErr_Occurred()) { Py_DECREF(tup); return FALSE; }
 
-    Py_DECREF(pyDigits);
     Py_DECREF(tup);
 
     // assign to DECIMAL
