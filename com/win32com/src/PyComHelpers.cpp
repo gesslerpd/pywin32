@@ -117,7 +117,7 @@ PYCOM_EXPORT PyObject *PyObject_FromDecimal(DECIMAL &dec)
     if (decimal_result == NULL) {
         return NULL;
     }
-    
+
     if (dec.scale > 0) {
         decimal_result = PyObject_CallMethod(decimal_result, scaleb, "l", -dec.scale);
     }
@@ -147,7 +147,9 @@ PYCOM_EXPORT BOOL PyObject_AsDecimal(PyObject *ob, DECIMAL *pdec)
 
     // get (sign, digits, exponent)
     PyObject *tup = PyObject_CallMethod(ob, "as_tuple", NULL);
-    if (!tup) return FALSE;
+    if (!tup) {
+        return FALSE;
+    }
     if (!PyTuple_Check(tup) || PyTuple_Size(tup) != 3) {
         Py_DECREF(tup);
         PyErr_SetString(PyExc_TypeError, "Decimal.as_tuple() did not return 3‐tuple");
@@ -156,41 +158,60 @@ PYCOM_EXPORT BOOL PyObject_AsDecimal(PyObject *ob, DECIMAL *pdec)
 
     // extract sign and exponent
     long sign = PyLong_AsLong(PyTuple_GET_ITEM(tup, 0));
-    long exp  = PyLong_AsLong(PyTuple_GET_ITEM(tup, 2));
-    if (PyErr_Occurred()) { Py_DECREF(tup); return FALSE; }
+    long exp = PyLong_AsLong(PyTuple_GET_ITEM(tup, 2));
+    if (PyErr_Occurred()) {
+        Py_DECREF(tup);
+        return FALSE;
+    }
 
     unsigned char scale = (exp < 0) ? (unsigned char)(-exp) : 0;
 
     PyObject *val;
     if (scale > 0) {
         val = PyObject_CallMethod(ob, "scaleb", "l", scale);
-        if (!val) { Py_DECREF(tup); return FALSE; }
+        if (!val) {
+            Py_DECREF(tup);
+            return FALSE;
+        }
     }
     else {
-        val = ob; Py_INCREF(val);
+        val = ob;
+        Py_INCREF(val);
     }
 
     TmpPyObject mant = PyNumber_Long(val);
     Py_DECREF(val);
-    if (!mant) { Py_DECREF(tup); return FALSE; }
+    if (!mant) {
+        Py_DECREF(tup);
+        return FALSE;
+    }
 
     unsigned long long lo64 = PyLong_AsUnsignedLongLong(mant);
-    if (PyErr_Occurred()) { Py_DECREF(tup); return FALSE; }
+    if (PyErr_Occurred()) {
+        Py_DECREF(tup);
+        return FALSE;
+    }
 
     TmpPyObject shamt = PyLong_FromLong(64);
     TmpPyObject high = PyNumber_Rshift(mant, shamt);
-    if (!high) { Py_DECREF(tup); return FALSE; }
+    if (!high) {
+        Py_DECREF(tup);
+        return FALSE;
+    }
 
     unsigned long hi32 = PyLong_AsUnsignedLong(high);
-    if (PyErr_Occurred()) { Py_DECREF(tup); return FALSE; }
+    if (PyErr_Occurred()) {
+        Py_DECREF(tup);
+        return FALSE;
+    }
 
     Py_DECREF(tup);
 
     pdec->wReserved = 0;
-    pdec->scale     = scale;
-    pdec->sign      = (unsigned char)sign;
-    pdec->Hi32      = hi32;
-    pdec->Lo64      = lo64;
+    pdec->scale = scale;
+    pdec->sign = (unsigned char)sign;
+    pdec->Hi32 = hi32;
+    pdec->Lo64 = lo64;
     return TRUE;
 }
 
