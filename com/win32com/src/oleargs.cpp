@@ -483,9 +483,9 @@ PyObject *PyCom_PyObjectFromVariant(const VARIANT *var)
             result = PyObject_FromCurrency(varValue.cyVal);
             break;
 
-        case VT_DECIMAL:
-            result = PyObject_FromDecimal(varValue.decVal);
-            break;
+        // case VT_DECIMAL:
+        //     result = PyObject_FromDecimal(varValue.decVal);
+        //     break;
 
         case VT_RECORD: {
             ULONG cb;
@@ -877,14 +877,14 @@ static PyObject *PyCom_PyObjectFromSAFEARRAYDimensionItem(SAFEARRAY *psa, VARENU
             subitem = PyObject_FromCurrency(c);
             break;
         }
-        case VT_DECIMAL: {
-            DECIMAL dec;
-            hres = SafeArrayGetElement(psa, arrayIndices, &dec);
-            if (FAILED(hres))
-                break;
-            subitem = PyObject_FromDecimal(dec);
-            break;
-        }
+        // case VT_DECIMAL: {
+        //     DECIMAL dec;
+        //     hres = SafeArrayGetElement(psa, arrayIndices, &dec);
+        //     if (FAILED(hres))
+        //         break;
+        //     subitem = PyObject_FromDecimal(dec);
+        //     break;
+        // }
         case VT_DATE: {
             DATE dt;
             hres = SafeArrayGetElement(psa, arrayIndices, &dt);
