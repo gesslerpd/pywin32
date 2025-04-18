@@ -94,6 +94,67 @@ PYCOM_EXPORT BOOL PyObject_AsCurrency(PyObject *ob, CURRENCY *pcy)
     return TRUE;
 }
 
+PYCOM_EXPORT PyObject *PyObject_FromDecimal(DECIMAL &dec)
+{
+    static char *hex_str_conv = "%lx%016llx";
+    static char *scaleb = "scaleb";
+    static char *multiply = "__mul__";
+    if (Decimal_class == NULL) {
+        Decimal_class = get_Decimal_class();
+        if (Decimal_class == NULL)
+            return FALSE;
+    }
+
+    // can be optimized by limit checking first to avoid string conversion
+    PyObject *pLongObj = NULL;
+    char buffer[32];
+    sprintf(buffer, hex_str_conv, dec.Hi32, dec.Lo64);
+    pLongObj = PyLong_FromString(buffer, NULL, 16);
+
+    TmpPyObject decimal_result = PyObject_CallFunction(Decimal_class, "O", pLongObj);
+    Py_XDECREF(pLongObj);
+
+    if (decimal_result == NULL) {
+        return NULL;
+    }
+    
+    if dec.scale > 0 {
+        decimal_result = PyObject_CallMethod(decimal_result, scaleb, "l", -dec.scale);
+    }
+
+    if dec.sign > 0 {
+        decimal_result = PyObject_CallMethod(decimal_result, multiply, "l", -1);
+    }
+
+    return decimal_result;
+}
+
+PYCOM_EXPORT BOOL PyObject_AsDecimal(PyObject *ob, DECIMAL *pdec)
+{
+    if (Decimal_class == NULL) {
+        Decimal_class = get_Decimal_class();
+        if (Decimal_class == NULL)
+            return FALSE;
+    }
+
+    int right_type = PyObject_IsInstance(ob, Decimal_class);
+    if (right_type == -1)
+        return FALSE;
+    else if (right_type == 0) {
+        PyErr_Format(PyExc_TypeError, "DECIMAL object must be a Decimal instance (got %s).", ob->ob_type->tp_name);
+        return FALSE;
+    }
+
+    // populate the DECIMAL *pdec structure from the decimal.Decimal *ob
+    // pdec->wReserved = ...;
+    // pdec->scale = ...;
+    // pdec->sign = ...;
+    // pdec->Hi32 = ...;
+    // pdec->Lo64 = ...;
+
+
+}
+
 // If PyCom_PyObjectFromIUnknown is called with bAddRef==FALSE, the
 // caller is asking us to take ownership of the COM reference.  If we
 // fail to create a Python object, we must release the reference.
