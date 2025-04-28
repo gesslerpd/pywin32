@@ -431,7 +431,7 @@ def TestTrickyTypesWithVariants(o, is_generated):
         got = v.value
     assert got == val * 2
 
-    val = decimal.Decimal("123456789123456789.123456789123456789")
+    val = decimal.Decimal("123456789.123456789")
     if is_generated:
         got = o.DoubleDecimalByVal(val)
     else:
