@@ -120,8 +120,6 @@ class CPyCOMTest : public IDispatchImpl<IPyCOMTest, &IID_IPyCOMTest, &LIBID_PyCO
     STDMETHOD(put_IntProp)(int val);
     STDMETHOD(get_CurrencyProp)(CY *ret);
     STDMETHOD(put_CurrencyProp)(CY val);
-    STDMETHOD(get_DecimalProp)(DECIMAL *ret);
-    STDMETHOD(put_DecimalProp)(DECIMAL val);
     STDMETHOD(get_ParamProp)(int which, int *ret2);
     STDMETHOD(put_ParamProp)(int which, int val);
 
