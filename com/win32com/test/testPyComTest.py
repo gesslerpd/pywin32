@@ -361,7 +361,7 @@ def TestCommon(o, is_generated):
         "0.123456789123456789",
         "-0.123456789123456789",
     ):
-        o.CurrencyProp = decimal.Decimal(val)
+        o.DecimalProp = decimal.Decimal(val)
         assert o.DecimalProp == decimal.Decimal(val), f"{val} got {o.DecimalProp!r}"
     v1 = decimal.Decimal("1234.5678")
     TestApplyResult(o.DoubleDecimal, (v1,), v1 * 2)

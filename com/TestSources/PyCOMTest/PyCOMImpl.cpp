@@ -1000,6 +1000,20 @@ HRESULT CPyCOMTest::get_CurrencyProp(CY *ret)
     return S_OK;
 }
 
+HRESULT CPyCOMTest::put_DecimalProp(DECIMAL val)
+{
+    m_dec = val;
+    return S_OK;
+}
+
+HRESULT CPyCOMTest::get_DecimalProp(DECIMAL *ret)
+{
+    if (!ret)
+        return E_POINTER;
+    *ret = (DECIMAL)m_dec;
+    return S_OK;
+}
+
 HRESULT CPyCOMTest::get_ParamProp(int which, int *ret)
 {
     if (!ret)
