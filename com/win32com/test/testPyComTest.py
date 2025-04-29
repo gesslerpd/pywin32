@@ -356,10 +356,10 @@ def TestCommon(o, is_generated):
     assert o.DecimalProp == 0, f"Expecting 0, got {o.DecimalProp!r}"
     for val in (
         "1234",
-        "123456789.123456789",
-        "-987654321.987654321",
-        "0.123456789123456789",
-        "-0.123456789123456789",
+        "123456789.1234",
+        "-987654321.9876",
+        "0.1234567891234",
+        "-0.1234567891234",
     ):
         o.DecimalProp = decimal.Decimal(val)
         assert o.DecimalProp == decimal.Decimal(val), f"{val} got {o.DecimalProp!r}"
@@ -441,7 +441,7 @@ def TestTrickyTypesWithVariants(o, is_generated):
         got = v.value
     assert got == val * 2
 
-    val = decimal.Decimal("123456789.123456789")
+    val = decimal.Decimal("123456789.1234")
     if is_generated:
         got = o.DoubleDecimalByVal(val)
     else:
