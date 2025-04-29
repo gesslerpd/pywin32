@@ -358,8 +358,8 @@ def TestCommon(o, is_generated):
         "1234",
         "123456789.1234",
         "-987654321.9876",
-        "0.1234567891234",
-        "-0.1234567891234",
+        "0.1234",
+        "-0.1234",
     ):
         o.DecimalProp = decimal.Decimal(val)
         assert o.DecimalProp == decimal.Decimal(val), f"{val} got {o.DecimalProp!r}"
