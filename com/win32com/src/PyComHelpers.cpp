@@ -200,20 +200,9 @@ PYCOM_EXPORT BOOL PyObject_AsDecimal(PyObject *ob, DECIMAL *pdec)
 
     unsigned char scale = (exp < 0) ? (unsigned char)(-exp) : 0;
 
-    // quantize to get an exact integer mantissa
-    PyObject *val = NULL;
+    PyObject *val;
     if (scale > 0) {
-        TmpPyObject one = PyObject_CallFunction(Decimal_class, "i", 1);
-        if (!one) {
-            Py_DECREF(tup);
-            return FALSE;
-        }
-        TmpPyObject quant = PyObject_CallMethod(one, "scaleb", "l", scale);
-        if (!quant) {
-            Py_DECREF(tup);
-            return FALSE;
-        }
-        val = PyObject_CallMethod(ob, "quantize", "O", quant);
+        val = PyObject_CallMethod(ob, "scaleb", "l", scale);
         if (!val) {
             Py_DECREF(tup);
             return FALSE;
@@ -223,9 +212,9 @@ PYCOM_EXPORT BOOL PyObject_AsDecimal(PyObject *ob, DECIMAL *pdec)
         val = ob;
         Py_INCREF(val);
     }
+
     TmpPyObject mant = PyNumber_Long(val);
     Py_DECREF(val);
-
     if (!mant) {
         Py_DECREF(tup);
         return FALSE;
